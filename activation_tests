@@ -1,0 +1,6 @@
+activation		time/itr (avg of 25)	notes
+*******		*********		*****
+relu			0.24941		cesar's code
+default (tanh)		0.24333		removed activation = 'relu' from LSTM def'n
+sigmoid		0.24377		added activation='sigmoid' to LSTM def'n
+linear			0.23559		activation=None
