@@ -75,7 +75,6 @@ def define_discriminator(image_shape, vector_shape):
     model.compile(loss='binary_crossentropy', optimizer=opt, loss_weights=[0.5])
     return model
 
-# %%
 # define an encoder block
 def define_encoder_block(layer_in, n_filters, batchnorm=True):
     # weight initialization
@@ -254,7 +253,7 @@ def summarize_performance(step, g_model, dataset, n_samples=1):
     print('>Saved: %s and %s' % (filename1, filename2))
 
 # train models
-def train(d_model, g_model, gan_model, dataset, latent_dim, n_epochs=50, n_batch=1):
+def train(d_model, g_model, gan_model, dataset, latent_dim, n_epochs=25, n_batch=3):
     # calculate the number of batches per training epoch
     bat_per_epo = int(len(dataset[0]) / n_batch)
     # calculate the number of training iterations
@@ -279,11 +278,9 @@ def train(d_model, g_model, gan_model, dataset, latent_dim, n_epochs=50, n_batch
             summarize_performance(i, g_model, dataset)
             print('saved')
             
-
 #%%
-%%time
 # load image data
-dataset = load_real_samples('0000.npz')
+dataset = load_real_samples('dataset.npz')
 print('Loaded', dataset[0].shape, dataset[1].shape)
 
 #%%
@@ -302,3 +299,5 @@ gan_model = define_gan(g_model, d_model, image_shape, vector_shape, latent_dim)
 #%%
 # train model
 train(d_model, g_model, gan_model, dataset, latent_dim)
+
+# %%

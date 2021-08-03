@@ -84,11 +84,11 @@ def plot_images(X_realA, X_fakeB, X_realB, filename, n_samples=1):
 #%%
 
 # load dataset
-[X1, X2] = load_real_samples('0000.npz')
+[X1, X2] = load_real_samples('dataset.npz')
 print('Loaded', X1.shape, X2.shape)
 #%%
 # load model
-model = load_model('model_058560.h5')
+model = load_model('model_063430.h5')
 
 #%%
 
@@ -99,6 +99,8 @@ ix = int(randint(0, len(X1), 1))
 src_image, tar_traj = X1[ix].reshape((1, 256, 256, 3)), X2[ix].reshape((1,40,3))
 # generate image from source
 gen_traj = model.predict([src_image, z_input])
-plot_images(src_image, gen_traj, tar_traj, 'sample6.png')
+plot_images(src_image, gen_traj, tar_traj, 'sample16.png')
 #%%
 
+
+# %%
