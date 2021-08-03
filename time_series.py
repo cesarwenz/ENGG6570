@@ -6,24 +6,24 @@ from numpy import zeros
 from numpy import ones
 from numpy.random import randint
 from numpy.random import randn
-from keras.optimizers import Adam
-from keras.initializers import RandomNormal
-from keras.models import Model
-from keras.models import Input
-from keras.layers import Dense
-from keras.layers import Reshape
-from keras.layers import Conv2D
-from keras.layers import Conv2DTranspose
-from keras.layers import LeakyReLU
-from keras.layers import Activation
-from keras.layers import Concatenate
-from keras.layers import Dropout
-from keras.layers import BatchNormalization
-from keras.layers import LSTM
-from keras.layers import Flatten
-from keras.layers import RepeatVector
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.initializers import RandomNormal
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Reshape
+from tensorflow.keras.layers import Conv2D
+from tensorflow.keras.layers import Conv2DTranspose
+from tensorflow.keras.layers import LeakyReLU
+from tensorflow.keras.layers import Activation
+from tensorflow.keras.layers import Concatenate
+from tensorflow.keras.layers import Dropout
+from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.layers import LSTM
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import RepeatVector
 from matplotlib import pyplot
-from keras.utils.vis_utils import plot_model
+from tensorflow.keras.utils import plot_model
 
 # define the discriminator model
 def define_discriminator(image_shape, vector_shape):
@@ -302,3 +302,4 @@ gan_model = define_gan(g_model, d_model, image_shape, vector_shape, latent_dim)
 #%%
 # train model
 train(d_model, g_model, gan_model, dataset, latent_dim)
+
