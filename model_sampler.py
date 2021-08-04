@@ -7,7 +7,9 @@ from numpy import load
 from numpy import vstack
 from matplotlib import pyplot
 from numpy.random import randint
+from numpy.random import randn
 import cv2
+import numpy as np
 
 # Overlay trajectories (data_y) to the image (data_x)
 def create_trajectory(data_x, data_y, obs_len=10):
@@ -48,6 +50,25 @@ def generate_latent_points(latent_dim, n_samples):
     x_input = x_input.reshape(n_samples, latent_dim)
     return x_input
 
+
+def generate_drvact_text(drvact):
+    text = '[warnings] drvact label is not defined ...'
+    if (drvact == 1):
+        text = 'Go'
+    elif (drvact == 2):
+        text = 'Turn Left'
+    elif (drvact == 3):
+        text = 'Turn Right'
+    elif (drvact == 4):
+        text = 'U-turn'
+    elif (drvact == 5):
+        text = 'Left LC'
+    elif (drvact == 6):
+        text = 'Right LC'
+    elif (drvact == 7):
+        text = 'Avoidance'
+    return text
+
 # plot source, generated and target images
 def plot_images(X_realA, X_fakeB, X_realB, filename, n_samples=1):
     X_realA = (X_realA + 1) / 2.0
@@ -58,10 +79,11 @@ def plot_images(X_realA, X_fakeB, X_realB, filename, n_samples=1):
         orig_image = (X_realA[i]* 255).astype(np.uint8)
         orig_image = cv2.resize(orig_image, (1280,360))
         pyplot.subplot(3, n_samples, 1 + i)
-        pyplot.axis('off')
+        # pyplot.axis('off')
         pyplot.imshow(orig_image)
         pyplot.title(titles[i])
     # plot generated target image
+    pyplot.text(10,20, 'Driver Action: ' + generate_drvact_text(label+1), color='red', fontsize=12, fontweight='extra bold')
     for i in range(n_samples):
         fake_sample = create_trajectory((X_realA[i]* 255).astype(np.uint8), X_fakeB[i])
         pyplot.subplot(3, n_samples, 1 + n_samples + i)
@@ -77,18 +99,23 @@ def plot_images(X_realA, X_fakeB, X_realB, filename, n_samples=1):
         pyplot.title(titles[i + 2])
     # save plot to file
     pyplot.subplots_adjust(hspace=0.4)
-    pyplot.savefig(filename)
     pyplot.show()
+    pyplot.savefig(filename)
+    
     # save the generator model
 
 #%%
 
 # load dataset
-[X1, X2] = load_real_samples('dataset.npz')
-print('Loaded', X1.shape, X2.shape)
+
+data = load('data/dual_condition_dataset_test.npz')
+# unpack arrays
+X1, X2, X3 = data['arr_0'], data['arr_1'], data['arr_2']
+X3 = X3-1
+
 #%%
 # load model
-model = load_model('model_063430.h5')
+model = load_model('model_056010.h5')
 
 #%%
 
@@ -96,11 +123,9 @@ model = load_model('model_063430.h5')
 latent_dim = 512
 z_input = generate_latent_points(latent_dim, 1)
 ix = int(randint(0, len(X1), 1))
-src_image, tar_traj = X1[ix].reshape((1, 256, 256, 3)), X2[ix].reshape((1,40,3))
+
+src_image, tar_traj, label = X1[ix].reshape((1, 256, 256, 3)), X2[ix].reshape((1,40,3)), X3[ix].reshape(1)
 # generate image from source
-gen_traj = model.predict([src_image, z_input])
-plot_images(src_image, gen_traj, tar_traj, 'sample16.png')
-#%%
+gen_traj = model.predict([src_image, z_input, label])
+plot_images(src_image, gen_traj, tar_traj, 'sample20.png')
 
-
-# %%
