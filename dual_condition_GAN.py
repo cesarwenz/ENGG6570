@@ -168,7 +168,7 @@ def load_real_samples(filename):
 	data = load(filename)
 	# unpack arrays
 	X1, X2, X3 = data['arr_0'], data['arr_1'], data['arr_2']
-	return [X1, X2, X3]
+	return [X1, X2, X3-1]
 
 # select a batch of random samples, returns images and target
 def generate_real_samples(dataset, n_samples):
@@ -232,51 +232,48 @@ def create_trajectory(data_x, data_y, obs_len=10):
     return data_x
 
 def generate_drvact_text(drvact):
-
     text = '[warnings] drvact label is not defined ...'
-    if (drvact == 0):
+    if (drvact == 1):
         text = 'Go'
-    elif (drvact == 6):
-        text = 'Turn Left'
-    elif (drvact == 5):
-        text = 'Turn Right'
-    elif (drvact == 1):
-        text = 'U-turn'
-    elif (drvact == 3):
-        text = 'Left LC'
-    elif (drvact == 4):
-        text = 'Right LC'
     elif (drvact == 2):
+        text = 'Turn Left'
+    elif (drvact == 3):
+        text = 'Turn Right'
+    elif (drvact == 4):
+        text = 'U-turn'
+    elif (drvact == 5):
+        text = 'Left LC'
+    elif (drvact == 6):
+        text = 'Right LC'
+    elif (drvact == 7):
         text = 'Avoidance'
-
     return text
 
 # generate samples and save as a plot and save the model
 def summarize_performance(step, g_model, dataset, n_samples=1):
     # select a sample of input images
-    [X_realA, X_realB], _ = generate_real_samples(dataset, n_samples)
+    [X_real_img, X_real_vec, X_label], _ = generate_real_samples(dataset, n_samples)
     # generate a batch of fake samples
-    X_fakeB, _ = generate_fake_samples(g_model, X_realA, n_samples)
+    X_fake_vec, _ = generate_fake_samples(g_model, X_real_img, X_label, n_samples)
     # scale all pixels from [-1,1] to [0,1]
-    X_realA = (X_realA + 1) / 2.0
+    X_real_img = (X_real_img + 1) / 2.0
     pyplot.figure(figsize=(32.0, 20.0))
     # plot real source images
     for i in range(n_samples):
-        orig_image = (X_realA[i]* 255).astype(np.uint8)
+        orig_image = (X_real_img[i]* 255).astype(np.uint8)
         orig_image = cv2.resize(orig_image, (1280,360))
-        # pyplot.text(50,70,generate_drvact_text(X3[i]), color='red', fontsize=12, fontweight='extra bold')
         pyplot.subplot(3, n_samples, 1 + i)
         pyplot.axis('off')
         pyplot.imshow(orig_image)
     # plot generated target image
     for i in range(n_samples):
-        fake_sample = create_trajectory((X_realA[i]* 255).astype(np.uint8), X_fakeB[i])
+        fake_sample = create_trajectory((X_real_img[i]* 255).astype(np.uint8), X_fake_vec[i])
         pyplot.subplot(3, n_samples, 1 + n_samples + i)
         pyplot.axis('off')
         pyplot.imshow(fake_sample)
     # plot real target image
     for i in range(n_samples):
-        true_sample = create_trajectory((X_realA[i]* 255).astype(np.uint8), X_realB[i])
+        true_sample = create_trajectory((X_real_img[i]* 255).astype(np.uint8), X_real_vec[i])
         pyplot.subplot(3, n_samples, 1 + n_samples*2 + i)
         pyplot.axis('off')
         pyplot.imshow(true_sample)
@@ -290,7 +287,7 @@ def summarize_performance(step, g_model, dataset, n_samples=1):
     print('>Saved: %s and %s' % (filename1, filename2))
 
 # train models
-def train(d_model, g_model, gan_model, dataset, latent_dim, n_epochs=25, n_batch=3):
+def train(d_model, g_model, gan_model, dataset, latent_dim, n_epochs=10, n_batch=3):
     # calculate the number of batches per training epoch
     bat_per_epo = int(len(dataset[0]) / n_batch)
     # calculate the number of training iterations
@@ -318,7 +315,7 @@ def train(d_model, g_model, gan_model, dataset, latent_dim, n_epochs=25, n_batch
 #%%
 %%time
 # load image data
-dataset = load_real_samples('dataset_with_label.npz')
+dataset = load_real_samples('data/dual_condition_dataset_train.npz')
 print('Loaded', dataset[0].shape, dataset[1].shape, dataset[2].shape)
 
 #%%
