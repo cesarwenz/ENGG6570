@@ -14,7 +14,8 @@ from keras.models import Input
 from keras.layers import Dense
 from keras.layers import Reshape
 from keras.layers import Conv2D
-from keras.layers import RepeatVector
+from keras.layers import LayerNormalization
+from keras.layers import Add
 from keras.layers import LeakyReLU
 from keras.layers import Activation
 from keras.layers import Concatenate
@@ -23,12 +24,18 @@ from keras.layers import BatchNormalization
 from keras.layers import LSTM
 from keras.layers import GRU
 from keras.layers import Flatten
-from keras.layers import Attention
+from keras.layers import MultiHeadAttention 
 from keras.layers import Embedding
 from keras.layers import Layer
 import keras.backend as K
 from matplotlib import pyplot
 from keras.utils.vis_utils import plot_model
+
+def mlp(x, hidden_units, dropout_rate):
+    for units in hidden_units:
+        x = Dense(units, activation=tf.nn.gelu)(x)
+        x = Dropout(dropout_rate)(x)
+    return x
 
 # define the discriminator model
 def define_discriminator(image_shape, vector_shape, n_classes=7):
@@ -88,6 +95,7 @@ def define_discriminator(image_shape, vector_shape, n_classes=7):
     model.compile(loss='binary_crossentropy', optimizer=opt, loss_weights=[0.5])
     return model
 
+
 # define an encoder block
 def define_encoder_block(layer_in, n_filters, batchnorm=True):
     # weight initialization
@@ -128,22 +136,34 @@ def define_generator(in_shape, vector_shape, latent_dim, n_classes=7):
     b = Conv2D(512, (4,4), strides=(2,2), padding='same', kernel_initializer=init)(e7)
     b = Activation('relu')(b)
     b = Flatten()(b)
-    # Merge latent space variable input with network
+    b = Dense(8000)(b)
+    projection = Reshape((40, 200))(b)
+
     m = Concatenate()([gen, li])
-    # Reshape to vector size
     n_nodes = (vector_shape[0] * vector_shape[1])
     m = Dense(n_nodes)(m)
     m = Reshape([vector_shape[0], vector_shape[1]])(m)
+    d = LSTM(200, activation='relu', return_sequences=True)(m)
+
+    # Layer normalization 1.
+    x1 = LayerNormalization(epsilon=1e-6)(projection)
+    # Create a multi-head attention layer.
+    attention_output = MultiHeadAttention(
+        num_heads=4, key_dim=200, dropout=0.1
+    )(d, x1)
+    # Skip connection 1.
+    x2 = Add()([attention_output, x1])
+    # Reshape to vector size
+
+    logits = Dense(3)(x2)
     # encoder-decoder LSTM model
-    d = LSTM(200, activation='relu', recurrent_initializer='glorot_uniform')(m)
-    d = RepeatVector(vector_shape[0])(d)
-    d = LSTM(200, activation='relu', return_sequences=True, recurrent_initializer='glorot_uniform')(m)
-    d = Flatten()(d)
-    d = Dense(512, activation='tanh', use_bias=False)(d)
-    attention = Attention()([b, d])
-    p = Dense(120, activation='tanh', use_bias=False)(attention)
+    # d = LSTM(200, activation='relu')(m)
+    # d = Flatten()(d)
+    # d = Dense(512)(d)
+    # attention = MultiHeadAttention()([b, d])
+    # p = Dense(120)(attention)
     # output
-    out_layer = Reshape((40, 3))(p)
+    out_layer = Reshape((40, 3))(logits)
 
     # define model input & output
     model = Model([in_image, in_lat, in_label], out_layer)
@@ -187,7 +207,7 @@ def generate_real_samples(dataset, n_samples):
 	# retrieve selected images
 	X1, X2, X3 = img[ix], vec[ix], label[ix]
 	# generate 'real' class labels 
-	y = ones((n_samples, 1))
+	y = ones((n_samples))
 	return [X1, X2, X3], y
 
 # generate points in latent space as input for the generator
@@ -205,7 +225,7 @@ def generate_fake_samples(g_model, samples, label, n_samples):
     # generate fake instance
     X = g_model.predict([samples, z_input, label])
     # create 'fake' class labels 
-    y = zeros((n_samples, 1))
+    y = zeros((len(X)))
     return X, y
 
 # Overlay trajectories (data_y) to the image (data_x)
@@ -294,32 +314,34 @@ def summarize_performance(step, g_model, dataset, n_samples=1):
     g_model.save(filename2)
     print('>Saved: %s and %s' % (filename1, filename2))
 
-# train models
-def train(d_model, g_model, gan_model, dataset, latent_dim, n_epochs=10, n_batch=3):
-    # calculate the number of batches per training epoch
-    bat_per_epo = int(len(dataset[0]) / n_batch)
+def train(d_model, g_model, gan_model, dataset, latent_dim, n_epochs=100, batch_size=14):
+    # iteration number to output checkpoint
+    display_iter = 5000
+    # calculate the number of batches
+    n_batch = int(len(dataset[0]) / batch_size)
     # calculate the number of training iterations
-    n_steps = bat_per_epo * n_epochs
+    n_steps = n_batch * n_epochs
     # manually enumerate epochs
     for i in range(n_steps):
         # select a batch of real samples
-        [X_real_img, X_real_vec, X_label], y_real = generate_real_samples(dataset, n_batch)
+        [X_real_img, X_real_vec, X_label], y_real = generate_real_samples(dataset, batch_size)
         # generate a batch of fake samples
-        X_fake_vec, y_fake = generate_fake_samples(g_model, X_real_img, X_label, n_batch)
+        X_fake_vec, y_fake = generate_fake_samples(g_model, X_real_img, X_label, batch_size)
         # update discriminator for real samples
         d_loss1 = d_model.train_on_batch([X_real_img, X_real_vec, X_label], y_real)
         # update discriminator for generated samples
         d_loss2 = d_model.train_on_batch([X_real_img, X_fake_vec, X_label], y_fake)
-        X_lat = generate_latent_points(latent_dim, n_batch)
+        X_lat = generate_latent_points(latent_dim, batch_size)
         # update the generator
         g_loss, _, _ = gan_model.train_on_batch([X_real_img, X_lat, X_label], [y_real, X_real_vec])
         # summarize performance
         print('>%d, d1[%.3f] d2[%.3f] g[%.3f]' % (i+1, d_loss1, d_loss2, g_loss))
         # summarize model performance
-        if (i+1) % int(bat_per_epo) == 0:
+        if (i+1) % int(display_iter) == 0:
             summarize_performance(i, g_model, dataset)
             print('saved')
-            
+
+
 #%%
 %%time
 # load image data

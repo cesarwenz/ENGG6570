@@ -135,7 +135,7 @@ def define_generator(in_shape, vector_shape, latent_dim, n_classes=7):
     b = Dense(n_nodes)(b)
     b = Reshape([vector_shape[0], vector_shape[1]])(b)
     # encoder-decoder LSTM model
-    d = Bidirectional(LSTM(200, activation='relu'))(b)
+    d = Bidirectional(LSTM(200, activation='relu', return_sequences=True))(b)
     # output
     out_layer = Dense(3)(d)
     # define model input & output
@@ -288,30 +288,33 @@ def summarize_performance(step, g_model, dataset, n_samples=1):
     print('>Saved: %s and %s' % (filename1, filename2))
 
 # train models
-def train(d_model, g_model, gan_model, dataset, latent_dim, n_epochs=10, n_batch=3):
-    # calculate the number of batches per training epoch
-    bat_per_epo = int(len(dataset[0]) / n_batch)
+def train(d_model, g_model, gan_model, dataset, latent_dim, n_epochs=100, batch_size=14):
+    # iteration number to output checkpoint
+    display_iter = 5000
+    # calculate the number of batches
+    n_batch = int(len(dataset[0]) / batch_size)
     # calculate the number of training iterations
-    n_steps = bat_per_epo * n_epochs
+    n_steps = n_batch * n_epochs
     # manually enumerate epochs
     for i in range(n_steps):
         # select a batch of real samples
-        [X_real_img, X_real_vec, X_label], y_real = generate_real_samples(dataset, n_batch)
+        [X_real_img, X_real_vec, X_label], y_real = generate_real_samples(dataset, batch_size)
         # generate a batch of fake samples
-        X_fake_vec, y_fake = generate_fake_samples(g_model, X_real_img, X_label, n_batch)
+        X_fake_vec, y_fake = generate_fake_samples(g_model, X_real_img, X_label, batch_size)
         # update discriminator for real samples
         d_loss1 = d_model.train_on_batch([X_real_img, X_real_vec, X_label], y_real)
         # update discriminator for generated samples
         d_loss2 = d_model.train_on_batch([X_real_img, X_fake_vec, X_label], y_fake)
-        X_lat = generate_latent_points(latent_dim, n_batch)
+        X_lat = generate_latent_points(latent_dim, batch_size)
         # update the generator
         g_loss, _, _ = gan_model.train_on_batch([X_real_img, X_lat, X_label], [y_real, X_real_vec])
         # summarize performance
         print('>%d, d1[%.3f] d2[%.3f] g[%.3f]' % (i+1, d_loss1, d_loss2, g_loss))
         # summarize model performance
-        if (i+1) % int(bat_per_epo) == 0:
+        if (i+1) % int(display_iter) == 0:
             summarize_performance(i, g_model, dataset)
             print('saved')
+
             
 #%%
 %%time
